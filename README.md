@@ -12,7 +12,7 @@ Migration from Docker to Rancher-managed RKE2 cluster with tiered storage and GP
 **Total Resources:**
 - RAM: 566GB (251GB + 251GB + 64GB)
 - Storage: 58TB (35TB RAID-Z2 + 8.8TB NVMe + 14.2TB backup/archive)
-- GPUs: 6x NVIDIA (exact models TBD)
+- GPUs: 5x NVIDIA (3x RTX 3090 on Chimera, 2x RTX 5090 on Cerberus)
 
 ## Quick Start
 

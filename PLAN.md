@@ -4,6 +4,19 @@
 
 Utilizing existing 58TB of storage across three servers without additional NAS hardware. Hydra's 42TB (6×7TB drives) becomes the primary storage pool in RAID-Z2, while NVMe drives on Chimera and Cerberus provide fast-tier caching for active workloads.
 
+## Hardware Configuration
+
+**3-Node Cluster:**
+- **Hydra**: Control plane + 35TB RAID-Z2 storage (251GB RAM)
+- **Chimera**: 3x RTX 3090 (24GB VRAM each = 72GB total) + 3TB NVMe model cache (251GB RAM)
+- **Cerberus**: 2x RTX 5090 (32GB VRAM each = 64GB total) + 5TB NVMe training workspace (64GB RAM)
+
+**Total Resources:**
+- **RAM**: 566GB (251GB + 251GB + 64GB)
+- **Storage**: 58TB (35TB RAID-Z2 + 8.8TB NVMe + 14.2TB backup/archive)  
+- **GPUs**: 5x NVIDIA (3x RTX 3090 @ 72GB VRAM, 2x RTX 5090 @ 64GB VRAM)
+- **Total VRAM**: 136GB across 5 GPUs
+
 ## Revised Storage Architecture
 
 ### Storage Tier Distribution
@@ -12,11 +25,11 @@ Utilizing existing 58TB of storage across three servers without additional NAS h
 graph TB
     subgraph "Tier 1: Fast NVMe Cache (8.8TB)"
         subgraph "Chimera NVMe"
-            C1[3.5TB NVMe<br/>Ollama Models<br/>Hot Cache]
+            C1[3.5TB NVMe<br/>Ollama Models<br/>Hot Cache<br/>3x RTX 3090]
         end
         subgraph "Cerberus NVMe"
             CE1[3.6TB System]
-            CE2[1.7TB Data<br/>Training Cache]
+            CE2[1.7TB Data<br/>Training Cache<br/>2x RTX 5090]
         end
     end
     
@@ -71,6 +84,7 @@ Storage Layout:
             /projects: 2TB              # Completed research
   
   Chimera (GPU Inference + Fast Cache):
+    Hardware: 3x RTX 3090 (72GB VRAM total), 251GB RAM
     /dev/nvme0n1: 3.5TB
       Partition Layout:
         nvme0n1p1: 500GB - System OS
@@ -87,6 +101,7 @@ Storage Layout:
       /metrics: 730GB                   # Prometheus data
   
   Cerberus (GPU Training + Fast Workspace):
+    Hardware: 2x RTX 5090 (64GB VRAM total), 64GB RAM
     /dev/nvme0n1: 3.6TB
       Partition Layout:
         nvme0n1p1: 500GB - System OS
@@ -97,6 +112,26 @@ Storage Layout:
     /dev/nvme1n1: 1.7TB
       /scratch: 1.7TB                   # Temporary training data
 ```
+
+## GPU Resource Allocation Strategy
+
+### Chimera (Inference Optimized)
+**Hardware**: 3x RTX 3090 (24GB VRAM each)
+**Use Case**: Ollama inference, multiple concurrent users
+**Configuration**:
+- **MPS Enabled**: 10 containers per GPU (30 total)
+- **Per-container VRAM**: ~2GB (7GB after model load)
+- **Model Strategy**: Keep 3-4 popular models in VRAM across GPUs
+- **Concurrent Users**: Up to 60 with queuing
+
+### Cerberus (Training Optimized)  
+**Hardware**: 2x RTX 5090 (32GB VRAM each)
+**Use Case**: Student training jobs, research workloads
+**Configuration**:
+- **MPS Settings**: 2-3 jobs per GPU max (4-6 total)
+- **Per-job VRAM**: ~10-15GB for training
+- **Model Strategy**: Load on-demand, evict after completion
+- **Priority**: Faculty > Graduate > Undergraduate
 
 ## Storage Migration Timeline
 
@@ -143,5 +178,6 @@ Storage Layout:
 4. **Network**: Prioritize 10GbE link for large transfers
 5. **Snapshots**: Hourly for active, daily for others
 6. **Cleanup**: Automatic rotation of old backups and snapshots
+7. **GPU Sharing**: MPS for Chimera (inference), larger allocations for Cerberus (training)
 
 This configuration maximizes the use of existing 58TB storage without requiring additional hardware while providing redundancy, performance tiers, and comprehensive backup capabilities.
